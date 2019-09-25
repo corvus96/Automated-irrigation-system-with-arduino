@@ -97,6 +97,36 @@ void loop() {
   // Debug by serial
   Serial.print("Brightness = ");
   Serial.println(bright);
+
+  //Turn on the humidity sensor
+  digitalWrite(humidPin, HIGH);
+  //Select humidity sensor on multiplexer
+  digitalWrite(selectLSBPin, HIGH);
+  //This is to ensure, the propagation times, don't matter lose one second
+  delay(1000);
+  // I got the humidity and save 
+  humid = (analogRead(ADCPin)/1024)*100;
+  // Turn off the humidity sensor feed
+  digitalWrite(humidPin, LOW);
+  // Debug by serial
+  Serial.print("Humidity = ");
+  Serial.println(humid);
+
+  //Turn on the temperature sensor
+  digitalWrite(tempPin, HIGH);
+  //Select temperature sensor on multiplexer
+  digitalWrite(selectMSBPin, HIGH);
+  //This is to ensure, the propagation times, don't matter lose one second
+  delay(1000);
+  // I got the temperature and save 
+  temp = (analogRead(ADCPin)/1024)*55;
+  // Turn off the temperature sensor feed and multiplexer 
+  digitalWrite(tempPin, LOW);
+  digitalWrite(selectMSBPin, LOW);
+  digitalWrite(selectLSBPin, LOW);
+  // Debug by serial
+  Serial.print("Temperature = ");
+  Serial.println(temp);
   
   // set the fields with the values
   ThingSpeak.setField(1, temp);
