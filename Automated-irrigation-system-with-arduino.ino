@@ -37,7 +37,7 @@ time_t fecha;
 #define keyOpenPin 12
 #define keyClosePin 13
 #define selectMSBPin 13
-#define ADCPin = A0;
+#define ADCPin A0
 
 char ssid[] = SECRET_SSID;   // your network SSID (name) 
 char pass[] = SECRET_PASS;   // your network password
