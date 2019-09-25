@@ -26,7 +26,10 @@
 #include "ThingSpeak.h"
 #include "secrets.h"
 #include <ESP8266WiFi.h>
+#include <Time.h>
+#include <TimeLib.h>
 
+time_t fecha;
 #define tempPin 0
 #define selectLSBPin 2
 #define humidPin 4
@@ -127,6 +130,8 @@ void loop() {
   // Debug by serial
   Serial.print("Temperature = ");
   Serial.println(temp);
+
+  controlKey(humid);
   
   // set the fields with the values
   ThingSpeak.setField(1, temp);
@@ -143,4 +148,33 @@ void loop() {
   }
   
   delay(1000); // Wait 20 seconds to update the channel again
+}
+
+void controlKey(double hum){
+  fecha = now();
+  Serial.print("Time is : ");
+  Serial.println(fecha);
+  if(hour(fecha) == 6 || hour(fecha) == 12 ){
+      while(hum<90){
+      //Turn on the humidity sensor
+      digitalWrite(humidPin, HIGH);
+      //Select humidity sensor on multiplexer
+      digitalWrite(selectLSBPin, HIGH);
+      //This is to ensure, the propagation times, don't matter lose one second
+      delay(1000);
+      // I got the humidity and save 
+      hum = (analogRead(ADCPin)/1024)*100;
+      // Turn off the humidity sensor feed
+      // Debug by serial
+      Serial.print("Humidity = ");
+      Serial.println(humid);
+      //Open key
+      digitalWrite(keyOpenPin, HIGH);
+    }
+    digitalWrite(humidPin, LOW);
+    digitalWrite(keyOpenPin, LOW);
+    digitalWrite(keyClosePin, HIGH);
+    delay(10000)
+    digitalWrite(keyClosePin, LOW);
+  }
 }
