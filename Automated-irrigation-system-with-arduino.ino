@@ -1,7 +1,7 @@
 /*
   WriteMultipleFields
   
-  Description: Writes values to fields 1,2,3,4 and status in a single ThingSpeak update every 20 seconds.
+  Description: Writes values to fields 1,2,3 in a single ThingSpeak update every minute.
   
   Hardware: ESP8266 based boards
   
@@ -22,7 +22,7 @@
   
   Copyright 2018, The MathWorks, Inc.
 */
- 
+
 #include "ThingSpeak.h"
 #include "secrets.h"
 #include <ESP8266WiFi.h>
@@ -46,53 +46,63 @@ unsigned long myChannelNumber = SECRET_CH_ID;
 const char * myWriteAPIKey = SECRET_WRITE_APIKEY;
 
 // Initialize our values
-int number1 = 0;
-int number2 = random(0,100);
-int number3 = random(0,100);
-int number4 = random(0,100);
-String myStatus = "";
+double temp;
+double humid;
+double bright;
 
 void setup() {
   Serial.begin(115200);  // Initialize serial
-
+  pinMode(tempPin, OUTPUT);
+  pinMode(humidPin, OUTPUT);
+  pinMode(LDRPin, OUTPUT);
+  pinMode(selectLSBPin, OUTPUT);
+  pinMode(selectMSBPin, OUTPUT);
+  pinMode(keyOpenPin, OUTPUT);
+  pinMode(keyClosePin, OUTPUT);
   WiFi.mode(WIFI_STA); 
   ThingSpeak.begin(client);  // Initialize ThingSpeak
 }
 
 void loop() {
-
+  int  flagToBreakConnect = 0; // Re-init flag
   // Connect or reconnect to WiFi
   if(WiFi.status() != WL_CONNECTED){
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(SECRET_SSID);
-    while(WiFi.status() != WL_CONNECTED){
+    while(WiFi.status() != WL_CONNECTED && flagToBreakConnect <= 60){
       WiFi.begin(ssid, pass);  // Connect to WPA/WPA2 network. Change this line if using open or WEP network
       Serial.print(".");
-      delay(5000);     
+      delay(5000);  
+      flagToBreakConnect++;   // This is necesary in case of  blackout
     } 
-    Serial.println("\nConnected.");
+    if(flagToBreakConnect == 60){
+      Serial.println("\nThe system can't connect please check your router configurations"); 
+    }
+    else{
+      Serial.println("\nConnected."); 
+    }
   }
 
+  //Turn on the brightness sensor
+  digitalWrite(LDRPin, HIGH);
+  //Select brightness sensor on multiplexer
+  digitalWrite(selectMSBPin, LOW);
+  digitalWrite(selectLSBPin, LOW);
+  //This is to ensure, the propagation times, don't matter lose one second
+  delay(1000);
+  // I got the brightness and save 
+  bright = (analogRead(ADCPin)/1024)*100;
+  // Turn off the brightness sensor feed
+  digitalWrite(LDRPin, LOW);
+  // Debug by serial
+  Serial.print("Brightness = ");
+  Serial.println(bright);
+  
   // set the fields with the values
-  ThingSpeak.setField(1, number1);
-  ThingSpeak.setField(2, number2);
-  ThingSpeak.setField(3, number3);
-  ThingSpeak.setField(4, number4);
+  ThingSpeak.setField(1, temp);
+  ThingSpeak.setField(2, humid);
+  ThingSpeak.setField(3, bright);
 
-  // figure out the status message
-  if(number1 > number2){
-    myStatus = String("field1 is greater than field2"); 
-  }
-  else if(number1 < number2){
-    myStatus = String("field1 is less than field2");
-  }
-  else{
-    myStatus = String("field1 equals field2");
-  }
-  
-  // set the status
-  ThingSpeak.setStatus(myStatus);
-  
   // write to the ThingSpeak channel
   int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
   if(x == 200){
@@ -102,14 +112,5 @@ void loop() {
     Serial.println("Problem updating channel. HTTP error code " + String(x));
   }
   
-  // change the values
-  number1++;
-  if(number1 > 99){
-    number1 = 0;
-  }
-  number2 = random(0,100);
-  number3 = random(0,100);
-  number4 = random(0,100);
-  
-  delay(20000); // Wait 20 seconds to update the channel again
+  delay(1000); // Wait 20 seconds to update the channel again
 }
