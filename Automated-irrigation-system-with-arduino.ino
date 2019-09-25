@@ -49,9 +49,9 @@ unsigned long myChannelNumber = SECRET_CH_ID;
 const char * myWriteAPIKey = SECRET_WRITE_APIKEY;
 
 // Initialize our values
-double temp;
-double humid;
-double bright;
+float temp;
+float humid;
+float bright;
 
 void setup() {
   Serial.begin(115200);  // Initialize serial
@@ -174,7 +174,7 @@ void controlKey(double hum){
     digitalWrite(humidPin, LOW);
     digitalWrite(keyOpenPin, LOW);
     digitalWrite(keyClosePin, HIGH);
-    delay(10000)
+    delay(10000);
     digitalWrite(keyClosePin, LOW);
   }
 }
