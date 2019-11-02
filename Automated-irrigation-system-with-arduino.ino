@@ -26,17 +26,14 @@
 #include "ThingSpeak.h"
 #include "secrets.h"
 #include <ESP8266WiFi.h>
-#include <Time.h>
-#include <TimeLib.h>
 
-time_t fecha;
-#define tempPin 0
-#define selectLSBPin 2
-#define humidPin 4
-#define LDRPin 5
-#define keyOpenPin 12
-#define keyClosePin 13
-#define selectMSBPin 13
+#define tempPin 0           // This is D3
+#define selectLSBPin 2      // This is D4
+#define humidPin 4          // This is D2
+#define LDRPin 5            // This is D1
+#define keyOpenPin 12       // This is D6
+#define keyClosePin 13      // This is D7
+#define selectMSBPin 14     // This is D5
 #define ADCPin A0
 
 char ssid[] = SECRET_SSID;   // your network SSID (name) 
@@ -44,11 +41,15 @@ char pass[] = SECRET_PASS;   // your network password
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 WiFiClient  client;
 
+// You can specify the time server pool and the offset, (in seconds)
+// additionaly you can specify the update interval (in milliseconds).
+// NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 unsigned long myChannelNumber = SECRET_CH_ID;
 const char * myWriteAPIKey = SECRET_WRITE_APIKEY;
 
 // Initialize our values
+int sensorValue;
 float temp;
 float humid;
 float bright;
@@ -75,10 +76,10 @@ void loop() {
     while(WiFi.status() != WL_CONNECTED && flagToBreakConnect <= 60){
       WiFi.begin(ssid, pass);  // Connect to WPA/WPA2 network. Change this line if using open or WEP network
       Serial.print(".");
-      delay(5000);  
+      delay(5000);            // Wait 5 seconds
       flagToBreakConnect++;   // This is necesary in case of  blackout
     } 
-    if(flagToBreakConnect == 60){
+    if(flagToBreakConnect == 60){ // If pass 300 seconds don´t connect
       Serial.println("\nThe system can't connect please check your router configurations"); 
     }
     else{
@@ -91,10 +92,11 @@ void loop() {
   //Select brightness sensor on multiplexer
   digitalWrite(selectMSBPin, LOW);
   digitalWrite(selectLSBPin, LOW);
-  //This is to ensure, the propagation times, don't matter lose one second
-  delay(1000);
+  //This is to ensure, the propagation times, don't matter lose three second
+  delay(3000);
   // I got the brightness and save 
-  bright = (analogRead(ADCPin)/1024)*100;
+  sensorValue = analogRead(ADCPin);
+  bright = map(sensorValue,0,1023,0,100);
   // Turn off the brightness sensor feed
   digitalWrite(LDRPin, LOW);
   // Debug by serial
@@ -104,11 +106,12 @@ void loop() {
   //Turn on the humidity sensor
   digitalWrite(humidPin, HIGH);
   //Select humidity sensor on multiplexer
-  digitalWrite(selectLSBPin, HIGH);
-  //This is to ensure, the propagation times, don't matter lose one second
-  delay(1000);
+  digitalWrite(selectMSBPin, HIGH);
+  //This is to ensure, the propagation times, don't matter lose three seconds
+  delay(3000);
   // I got the humidity and save 
-  humid = (analogRead(ADCPin)/1024)*100;
+  sensorValue = analogRead(ADCPin);
+  humid = map(sensorValue,937,430,0,100);
   // Turn off the humidity sensor feed
   digitalWrite(humidPin, LOW);
   // Debug by serial
@@ -119,10 +122,12 @@ void loop() {
   digitalWrite(tempPin, HIGH);
   //Select temperature sensor on multiplexer
   digitalWrite(selectMSBPin, HIGH);
-  //This is to ensure, the propagation times, don't matter lose one second
-  delay(1000);
-  // I got the temperature and save 
-  temp = (analogRead(ADCPin)/1024)*55;
+  digitalWrite(selectLSBPin, HIGH);
+  //This is to ensure, the propagation times, don't matter lose three seconds
+  delay(3000);
+  // I got the temperature and save
+  sensorValue = analogRead(ADCPin); 
+  temp = map(sensorValue,0,1024,0,40);// 40 is The full scale value of temperature that can register
   // Turn off the temperature sensor feed and multiplexer 
   digitalWrite(tempPin, LOW);
   digitalWrite(selectMSBPin, LOW);
@@ -139,42 +144,43 @@ void loop() {
   ThingSpeak.setField(3, bright);
 
   // write to the ThingSpeak channel
-  int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-  if(x == 200){
-    Serial.println("Channel update successful.");
-  }
-  else{
-    Serial.println("Problem updating channel. HTTP error code " + String(x));
+  if(humid <= 100){   // This is necesary because sometimes the humid sensor reads a bad value 
+      int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+     
+      if(x == 200){ 
+        Serial.println("Channel update successful.");
+      }
+      else{
+        Serial.println("Problem updating channel. HTTP error code " + String(x));
+      }
+    }
+    delay(10000); // Wait ten seconds to update the channel again
   }
   
-  delay(1000); // Wait 20 seconds to update the channel again
-}
 
-void controlKey(double hum){
-  fecha = now();
-  Serial.print("Time is : ");
-  Serial.println(fecha);
-  if(hour(fecha) == 6 || hour(fecha) == 12 ){
-      while(hum<90){
+void controlKey(float hum){
+  if(hum < 50){ // This is a arbitrary value because the humid parameter depends on the type of crop
       //Turn on the humidity sensor
-      digitalWrite(humidPin, HIGH);
+      digitalWrite(humidPin, HIGH);   
       //Select humidity sensor on multiplexer
-      digitalWrite(selectLSBPin, HIGH);
-      //This is to ensure, the propagation times, don't matter lose one second
-      delay(1000);
+      digitalWrite(selectMSBPin, HIGH);
+      while(hum<80){
+      //This is to ensure, the propagation times, don't matter lose five seconds
+      delay(5000);                  
       // I got the humidity and save 
-      hum = (analogRead(ADCPin)/1024)*100;
+      sensorValue = analogRead(ADCPin);
+      hum = map(sensorValue,937,430,0,100);
       // Turn off the humidity sensor feed
       // Debug by serial
       Serial.print("Humidity = ");
-      Serial.println(humid);
+      Serial.println(hum);
       //Open key
       digitalWrite(keyOpenPin, HIGH);
     }
     digitalWrite(humidPin, LOW);
     digitalWrite(keyOpenPin, LOW);
     digitalWrite(keyClosePin, HIGH);
-    delay(10000);
+    delay(10000);                   // This is the the necesary time to close the valve (ten seconds)
     digitalWrite(keyClosePin, LOW);
   }
 }
